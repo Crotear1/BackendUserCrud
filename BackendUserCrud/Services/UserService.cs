@@ -1,10 +1,7 @@
 ﻿// Services/UserService.cs
 using MySql.Data.MySqlClient;
 using UserManagementAPI.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using System.Data; // Für IConfiguration
+using System.Data;
 
 namespace UserManagementAPI.Services
 {
@@ -52,30 +49,21 @@ namespace UserManagementAPI.Services
         /// <returns>Den erstellten User mit von der DB generierter Id und CreatedAt, oder null bei einem Fehler.</returns>
         public async Task<User?> CreateUserAsync(User userToCreate)
         {
-            // Überprüfe, ob die notwendigen Daten vorhanden sind
             if (userToCreate == null || string.IsNullOrWhiteSpace(userToCreate.Username) || string.IsNullOrWhiteSpace(userToCreate.Email))
             {
-                // Hier könntest du eine ArgumentNullException oder ArgumentException werfen
-                // oder einfach null zurückgeben, je nachdem, wie du Fehler behandeln möchtest.
-                // Console.WriteLine("User-Objekt oder dessen Username/Email sind ungültig für die Erstellung.");
                 return null;
             }
 
             using (var connection = new MySqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
-
-                // SQL-Befehl zum Einfügen des Benutzers und zum Abrufen des neu erstellten Datensatzes.
-                // 'id' ist AUTO_INCREMENT und 'created_at' hat einen DEFAULT CURRENT_TIMESTAMP.
                 var query = @"
             INSERT INTO users (username, email)
             VALUES (@Username, @Email);
             SELECT id, username, email, created_at FROM users WHERE id = LAST_INSERT_ID();";
-                // Wichtig: Spaltennamen in SELECT müssen exakt mit denen in der DB übereinstimmen (id, username, email, created_at)
 
                 using (var command = new MySqlCommand(query, connection))
                 {
-                    // Parameter hinzufügen, um SQL-Injection zu verhindern
                     command.Parameters.AddWithValue("@Username", userToCreate.Username);
                     command.Parameters.AddWithValue("@Email", userToCreate.Email);
 
@@ -83,11 +71,11 @@ namespace UserManagementAPI.Services
                     {
                         using (var reader = await command.ExecuteReaderAsync())
                         {
-                            if (await reader.ReadAsync()) // Lese den durch SELECT zurückgegebenen Datensatz
+                            if (await reader.ReadAsync())
                             {
                                 return new User
                                 {
-                                    Id = reader.GetInt32("id"), // Achte auf korrekte Spaltennamen
+                                    Id = reader.GetInt32("id"),
                                     Username = reader.GetString("username"),
                                     Email = reader.GetString("email"),
                                     CreatedAt = reader.GetDateTime("created_at")
@@ -97,21 +85,15 @@ namespace UserManagementAPI.Services
                     }
                     catch (MySqlException ex)
                     {
-                        // Fehlerbehandlung, z.B. wenn die E-Mail bereits existiert (Unique Constraint Violation)
-                        // Fehlercode 1062 für Duplicate entry
-                        // Console.WriteLine($"MySQL Fehler beim Erstellen des Benutzers: {ex.Message} (Nummer: {ex.Number})");
-                        // Hier könntest du spezifische Fehler loggen oder basierend auf ex.Number anders reagieren.
-                        return null; // Gib null zurück oder wirf eine spezifischere Ausnahme
+                        return null;
                     }
                     catch (Exception ex)
                     {
-                        // Allgemeine Fehlerbehandlung
-                        // Console.WriteLine($"Allgemeiner Fehler beim Erstellen des Benutzers: {ex.Message}");
                         return null;
                     }
                 }
             }
-            return null; // Sollte nicht erreicht werden, wenn alles gut geht, oder wenn ein Fehler oben nicht abgefangen wurde
+            return null;
         }
 
 
@@ -122,28 +104,23 @@ namespace UserManagementAPI.Services
         /// <returns>Den gefundenen User oder null, wenn kein Benutzer mit dieser ID existiert oder ein Fehler auftritt.</returns>
         public async Task<User?> GetUserByIdAsync(int id)
         {
-            User? user = null; // Initialisiere mit null, falls kein Benutzer gefunden wird
+            User? user = null;
 
             using (var connection = new MySqlConnection(_connectionString))
             {
                 await connection.OpenAsync();
 
-                // SQL-Befehl zum Auswählen eines einzelnen Benutzers anhand seiner ID.
-                // Achte darauf, dass die Spaltennamen (id, username, email, created_at)
-                // exakt mit denen in deiner Datenbanktabelle übereinstimmen.
                 var query = "SELECT id, username, email, created_at FROM users WHERE id = @Id;";
 
                 using (var command = new MySqlCommand(query, connection))
                 {
-                    // Parameter hinzufügen, um SQL-Injection zu verhindern.
-                    // Der Parametername @Id muss mit dem im Query übereinstimmen.
                     command.Parameters.AddWithValue("@Id", id);
 
                     try
                     {
                         using (var reader = await command.ExecuteReaderAsync())
                         {
-                            if (await reader.ReadAsync()) // Wenn ein Datensatz gefunden wurde
+                            if (await reader.ReadAsync())
                             {
                                 user = new User
                                 {
@@ -153,29 +130,22 @@ namespace UserManagementAPI.Services
                                     CreatedAt = reader.GetDateTime("created_at")
                                 };
                             }
-                            // Wenn reader.ReadAsync() false zurückgibt, wurde kein Benutzer gefunden,
-                            // und 'user' bleibt null.
                         }
                     }
                     catch (MySqlException ex)
                     {
-                        // Hier solltest du den Fehler loggen, z.B. mit einem ILogger.
-                        // _logger?.LogError(ex, "Ein MySQL-Fehler ist beim Abrufen des Benutzers mit ID {UserId} aufgetreten.", id);
-                        Console.WriteLine($"MySQL Fehler in GetUserByIdAsync für ID {id}: {ex.Message}");
-                        // In diesem Fall geben wir null zurück, was der Controller als "Nicht gefunden" oder Fehler interpretieren kann.
+                        Console.WriteLine($"MySQL Fehler in GetUserByIdAsync für ID {id}: {ex.Message}");.
                         return null;
                     }
                     catch (Exception ex)
                     {
-                        // Allgemeiner Fehler
-                        // _logger?.LogError(ex, "Ein allgemeiner Fehler ist beim Abrufen des Benutzers mit ID {UserId} aufgetreten.", id);
                         Console.WriteLine($"Allgemeiner Fehler in GetUserByIdAsync für ID {id}: {ex.Message}");
                         return null;
                     }
                 }
             }
 
-            return user; // Gibt den gefundenen Benutzer zurück oder null, wenn nicht gefunden oder ein Fehler auftrat.
+            return user;
         }
     }
 }
